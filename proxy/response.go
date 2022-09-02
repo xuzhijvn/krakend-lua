@@ -23,6 +23,7 @@ func registerResponseTable(resp *proxy.Response, b *binder.Binder) {
 	list.Dynamic("set", listSet)
 	list.Dynamic("len", listLen)
 	list.Dynamic("del", listDel)
+	list.Dynamic("add", listAdd)
 
 	r := &response{resp}
 	if r.Metadata.Headers == nil {
@@ -323,6 +324,40 @@ func listDel(c *binder.Context) error {
 	}
 	tab.data[last] = nil
 	tab.data = tab.data[:last]
+	return nil
+}
+
+func listAdd(c *binder.Context) error {
+	if c.Top() != 2 {
+		return errNeedsArguments
+	}
+	tab, ok := c.Arg(1).Data().(*luaList)
+	if !ok {
+		return errResponseExpected
+	}
+
+	switch t := c.Arg(2).Any().(type) {
+	case lua.LString:
+		tab.data = append(tab.data, c.Arg(2).String())
+	case lua.LNumber:
+		tab.data = append(tab.data, c.Arg(2).Number())
+	case lua.LBool:
+		tab.data = append(tab.data, c.Arg(2).Bool())
+	case *lua.LTable:
+		res := map[string]interface{}{}
+		t.ForEach(func(k, v lua.LValue) {
+			parseToTable(k, v, res)
+		})
+		tab.data = append(tab.data, res)
+	case *lua.LUserData:
+		switch v := t.Value.(type) {
+		case *luaTable:
+			tab.data = append(tab.data, v.data)
+		case *luaList:
+			tab.data = append(tab.data, v.data)
+		}
+	}
+
 	return nil
 }
 
