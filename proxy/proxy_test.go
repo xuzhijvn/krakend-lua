@@ -486,6 +486,10 @@ func Test_ListAdd(t *testing.T) {
 	col:add(col:get(0))
 	col:add(col:get(1))
 
+	local respData = {}
+	respData['long_name']='实时快讯'
+	col:add(respData)
+
 	local size = col:len()
 	responseData:set("total", size)
 
