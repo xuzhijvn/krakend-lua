@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	Id            string
 	Sources       []string
 	PreCode       string
 	PostCode      string
@@ -38,6 +39,9 @@ func Parse(l logging.Logger, e config.ExtraConfig, namespace string) (Config, er
 	c, ok := v.(map[string]interface{})
 	if !ok {
 		return res, ErrWrongExtraConfig
+	}
+	if id, ok := c["id"].(string); ok {
+		res.Id = id
 	}
 	if pre, ok := c["pre"].(string); ok {
 		res.PreCode = pre

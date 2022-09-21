@@ -529,3 +529,76 @@ func Test_ListAdd(t *testing.T) {
 
 	fmt.Println(buff.String())
 }
+
+func Test_ListAdd2(t *testing.T) {
+	buff := bytes.NewBuffer(make([]byte, 1024))
+	logger, err := logging.NewLogger("ERROR", buff, "pref")
+	if err != nil {
+		t.Error("building the logger:", err.Error())
+		return
+	}
+
+	response := `{
+  "items": [
+    {"id": 1, "name": "foo", "funny_property": true, "long_name": "foo bar"},
+    {"id": 2, "name": "foo2", "funny_property": false, "long_name": "foo2 bar2"}
+  ]
+}`
+	r := map[string]interface{}{}
+	json.Unmarshal([]byte(response), &r)
+
+	dummyProxyFactory := proxy.FactoryFunc(func(_ *config.EndpointConfig) (proxy.Proxy, error) {
+		return func(ctx context.Context, req *proxy.Request) (*proxy.Response, error) {
+			return &proxy.Response{
+				Data: r,
+				Metadata: proxy.Metadata{
+					Headers: map[string][]string{},
+				},
+			}, nil
+		}, nil
+	})
+
+	prxy, err := ProxyFactory(logger, dummyProxyFactory).New(&config.EndpointConfig{
+		Endpoint: "/",
+		ExtraConfig: config.ExtraConfig{
+			ProxyNamespace: map[string]interface{}{
+				"post": `
+	local resp = response.load()
+	local responseData = resp:data()
+	local data = {}
+	local col = responseData:get("items")
+	
+	col:add(col:get(0))
+	col:add(col:get(1))
+
+	local respData = {}
+	respData['long_name']='实时快讯'
+	col:add(respData)
+	responseData:set("items", col)
+`,
+			},
+		},
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	URL, _ := url.Parse("https://some.host.tld/path/to/resource?and=querystring")
+
+	resp, err := prxy(context.Background(), &proxy.Request{
+		Method:  "GET",
+		Path:    "/some-path",
+		Params:  map[string]string{"Id": "42"},
+		Headers: map[string][]string{},
+		URL:     URL,
+		Body:    ioutil.NopCloser(strings.NewReader("initial req content")),
+	})
+	fmt.Println(resp.Data)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(buff.String())
+}
